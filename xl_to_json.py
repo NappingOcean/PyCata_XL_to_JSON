@@ -157,7 +157,15 @@ class File_manager:
                 dix[key] = []
             dix[key].append(val)
 
+    #list가 아니라도 list로 만들어주마.
+    def fc_append(self, is_it_list, not_list):
+        if isinstance(is_it_list, list):
+            return (lambda lst:lst.append(not_list))(is_it_list)
+        else:
+            return [is_it_list,not_list]
 
+
+    # 해당 셀 아래로 데이터가 있는 셀이 얼마나 연달아 나오는가?
     def col_ser_check(self, ws, row, col):
         ser_num = 1
         for check_row in ws.rows[row + 1:]:
@@ -169,9 +177,10 @@ class File_manager:
     # vals 는 2차원 리스트로 작성된다.
     def vals_from_xl(self):
         xl_data = self.load_xlsx()
+        vals_dict = {}
         for name in xl_data.sheetnames:
             xl_sheet = xl_data[name]
-            vals = []
+            vals_list = []
             # 첫 줄 row 는 key가 있는 곳이다! 
             # 따라서 rows[0]은 배제한다.
             for row in xl_sheet.rows[1:]:
@@ -187,33 +196,63 @@ class File_manager:
                     if cel: # 해당 셀에 값이 있을 경우.
                         if val_key: # key 존재 시.
                             if val_id: # id 존재 시.
-                                if v_list:
-                                    val_row.append(v_list)
-                                # 이 아래로 id 없는 값 존재 시.
-                                if not xl_sheet.cell( row + 1, 1 ).value:
+                                if (row != xl_sheet.max_row) and not bool(xl_sheet.cell( row + 1, 1 ).value): # 여기가 끝 아님 and 이 아래로 id 없는 값 존재 시.
                                     no_id_num = self.col_ser_check(xl_sheet, row, col)
 
                                     v_list_col = [ xl_sheet.cell(list_row, col).value for list_row in xl_sheet.rows[row : row + no_id_num] ]
                                     # id 없는 모든 값들을 리스트로 흡수함.
                                     val_row.append(v_list_col)
-                                else:
+                                else: # 다음 값 id 있다
                                     val_row.append(cel)
-                                    
+                                
+                                # 리셋
                                 v_list = []
+                                bool_v_2d_list = False
+                        
                         else: # key 부재 시.
                             if val_id: # id 존재 시.
                                 if pre_cel in val_row: 
                                     val_row.remove(pre_cel) 
                                     v_list.append(pre_cel)
-                                    #TODO: id 없는 애들 어케 흡수하냐.
+                                #pre_cel 이 있든 없든 아래는 진행.
                                 v_list.append(cel)
-                        
+                                
+                                #이 아래에 id 없는 값이 있을 시.
+                                if not xl_sheet.cell(row + 1, 1).value:
+                                    # 이 때 cel은 이미 key가 없는 곳의 셀이다
+                                    # 즉 앞의 pre_cel과 v_list를 이미 이루고 있다는 뜻.
+
+                                    no_id_num = self.col_ser_check(xl_sheet, row, col)
+                                    
+                                    # 현재 셀에서 len(v_list) 만큼 왼쪽까지의 셀 값을 list로 만든다
+                                    # 상기의 list 생성 과정을 현재 셀에서 no_id_num 갯수만큼 아래로 내려가며 반복한다
+                                    v_2d_list_col = [[xl_sheet.cell(list_row, list_col).value for list_col in xl_sheet.columns[col+1 -len(v_list): col+1]] for list_row in xl_sheet.columns[row: row + no_id_num]]
+                                    
+                                    bool_v_2d_list = True
+                                
+                                if bool(xl_sheet.cell(1, col+1).value) or (col == xl_sheet.max_column):
+                                    if bool_v_2d_list:
+                                        # 2d list가 되었으면 그걸로 넣는다
+                                        val_row.append(v_2d_list_col)
+                                    else:
+                                        # v_list 를 val 에 추가
+                                        val_row.append(v_list)
+
                         # 값이 있는 셀은 이전 셀로 만든다.
                         pre_cel = cel
-                vals.append(val_row)
+                vals_list.append(val_row)
+            vals_dict[name] = vals_list
+        # vals_dict에 저장되는 값은 다음과 같다
+        # vals_dict --> {"name":
+        #                   [
+        #                       [v11, v12, v13, ...]
+        #                       [v21, v22, v23, ...] 
+        #                       ...
+        #                   ]
+        #                }
+        return vals_dict    
 
-    def keys_from_xl(self):
-        xl_data = self.load_xlsx()
+
 
 
     # 본격적으로 딕셔너리 구축            
