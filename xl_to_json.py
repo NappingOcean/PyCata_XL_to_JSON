@@ -271,16 +271,14 @@ class File_manager:
         # 끄트머리가 하나씩 빠져있는 k_map 으로 구조 만들기
         
         bld_dix = {}
+        bool_in_there = False
         for k_serial in k_map:
             
             v_dix = dix_last[k_serial[-1]]
             
-            # tmp 딕셔너리에 끝 딕셔너리 넣음.
             tmp_dix = { k_serial[-1] : v_dix }
-            
             # k_serial 에 저장된 k_part 마다. (.../k13/k12/k11)
             for k_part in reversed(k_serial):
-                # k_part가 끝 값이 아닌 경우.
                 if k_part != k_serial[-1]:
                     if k_part.endswith(':list'):
                         k_part_cut = k_part.removesuffix(':list')
@@ -292,34 +290,39 @@ class File_manager:
                         for k_part2 in k_serial[:k_serial.index(k_part)+1]:
                             if k_part2.endswith(':list'):
                                 k_part2_cut = k_part2.removesuffix(':list')
-                                # 저장된 키에 k_part2_cut 이 있으면
-                                if k_part2_cut in vald_dix:
-                                    vald_dix = vald_dix [k_part2_cut]
-                                    # 이 for-loop 가 끝에 다다랐으면
-                                    if k_part2 == k_part:
-                                        # 무작정 append 를 하게 되면 그냥 무지성으로 따라라락 붙게 된다. 즉 적절한 순간에 컷 하고 넘어갈 수 있어야 하는데...
-                                        tmp_dix[k_part_cut].append({k_part2_cut:vald_dix})
+                                # 저장된 키에 k_part2_cut 이 있으면 vald_dix 안을 스코핑.
+                                
+                                if isinstance(vald_dix,list):
+                                    for vald_dix_ele in vald_dix:
+                                        if k_part2_cut in vald_dix_ele:
+                                            vald_dix = vald_dix_ele[k_part2_cut]
+                                            bool_in_there = True
+                                            break
 
-                        # 결과: {'id': 'id_sample1', 'name': {'str': '샘플 이름'}, 'skills': [{'level': 3}, {'skills': [{'skill': [{'craft': 'ALL'}]}, {'skills': [{'skill': [{'combat': 'slash'}]}]}]}]}
-                        # 지금 skills 안에서 제대로 묶이질 않고 있다! 아오.
-                        # 저거 어떻게든 결과 안에서 묶어야 하는데 흠...
-                    
+                                elif k_part2_cut in vald_dix:
+                                    vald_dix = vald_dix [k_part2_cut]
+                                    bool_in_there = True
+                                    
+                                if k_part2 == k_part and bool_in_there:
+                                    for tmp_val in tmp_dix[k_part_cut]:
+                                        if not tmp_val in vald_dix:
+                                            vald_dix.append(tmp_val)
+                                    tmp_dix[k_part_cut] = vald_dix
+                                    bool_in_there = False
+                                    pass
+
+                    # 결과: 
+                    # {'id': 'id_sample1', 'name': {'str': '샘플 이름'}, 'skills': [{'skill': [{'combat': 'slash'}]}, {'skill': [{'craft': 'ALL'}]}, {'level': 3}]} 
+                    # 아니 시펄 저거 왜 하나로 안 묶이냐고!
+                    # skill에 스코프가 갔을 때 두개를 하나로 묶어야 하는데 그게 왜 안되지?
+
                     # tmp_dix 재귀
                     # 딕셔너리 변수 재정의라서 가능함
                     else:
                         tmp_dix = { k_part:tmp_dix }
             
             #상기의 for loop가 끝나면 tmp_dix를 넣는다
-
-            #상기의 for loop가 끝나고, 이제 bld_dix 에 이미 있는 값과 비교한다.
-            # vald_dix = bld_dix
-            # for k_part in k_serial:
-            #     if k_part in vald_dix:
-            #         # 겹치는 키가 있으면 파고든다.
-            #         vald_dix = vald_dix[k_part]
-            #     else:
-            #         vald_dix = {k_part:[]}
-                    
+            
             bld_dix.update(tmp_dix)
 
         return bld_dix
