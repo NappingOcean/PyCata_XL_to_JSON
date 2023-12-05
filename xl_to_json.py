@@ -272,58 +272,105 @@ class File_manager:
         
         bld_dix = {}
         bool_in_there = False
+
         for k_serial in k_map:
-            
-            v_dix = dix_last[k_serial[-1]]
-            
-            tmp_dix = { k_serial[-1] : v_dix }
-            # k_serial 에 저장된 k_part 마다. (.../k13/k12/k11)
-            for k_part in reversed(k_serial):
-                if k_part != k_serial[-1]:
-                    if k_part.endswith(':list'):
-                        k_part_cut = k_part.removesuffix(':list')
-                        tmp_dix = {k_part_cut:[tmp_dix]}
-                        # 이미 k_part_cut에 데이터가 있으면???
-                        # bld_dix 안에 있는 쌍을 호출해야 한다.
-                        vald_dix = bld_dix
-                        # k_serial의 처음부터 k_part(포함)까지 놓은 것을 반복
-                        for k_part2 in k_serial[:k_serial.index(k_part)+1]:
-                            if k_part2.endswith(':list'):
-                                k_part2_cut = k_part2.removesuffix(':list')
-                                # 저장된 키에 k_part2_cut 이 있으면 vald_dix 안을 스코핑.
-                                
-                                if isinstance(vald_dix,list):
-                                    for vald_dix_ele in vald_dix:
-                                        if k_part2_cut in vald_dix_ele:
-                                            vald_dix = vald_dix_ele[k_part2_cut]
-                                            bool_in_there = True
-                                            break
-
-                                elif k_part2_cut in vald_dix:
-                                    vald_dix = vald_dix [k_part2_cut]
-                                    bool_in_there = True
-                                    
-                                if k_part2 == k_part and bool_in_there:
-                                    for tmp_val in tmp_dix[k_part_cut]:
-                                        if not tmp_val in vald_dix:
-                                            vald_dix.append(tmp_val)
-                                    tmp_dix[k_part_cut] = vald_dix
-                                    bool_in_there = False
-                                    pass
-
-                    # 결과: 
-                    # {'id': 'id_sample1', 'name': {'str': '샘플 이름'}, 'skills': [{'skill': [{'combat': 'slash'}]}, {'skill': [{'craft': 'ALL'}]}, {'level': 3}]} 
-                    # 아니 시펄 저거 왜 하나로 안 묶이냐고!
-                    # skill에 스코프가 갔을 때 두개를 하나로 묶어야 하는데 그게 왜 안되지?
-
-                    # tmp_dix 재귀
-                    # 딕셔너리 변수 재정의라서 가능함
+            tmp_idx = 0
+            k_idx = 0
+            for k in reversed(k_serial):
+                k_idx-=1
+                k_cut = k.removesuffix(':list')
+                if k == k_serial[-1]:
+                    tmp_dix = {}
+                    if k.endswith(':list') and not isinstance(dix_last[k], list):
+                        tmp_dix = {k_cut:[dix_last[k]]}
                     else:
-                        tmp_dix = { k_part:tmp_dix }
+                        tmp_dix = {k_cut:dix_last[k]}
+                else: # k가 맨 끝에 있는 k 가 아니다.
+                    if not k.endswith(':list'):
+                        tmp_dix = {k:tmp_dix}
+                    elif not k in [k_ser[k_idx] for k_ser in k_map[:k_map.index(k_serial)] if len(k_ser)+k_idx >= 0 and k_ser[:k_idx] == k_serial[:k_idx]]:
+                        tmp_dix = {k_cut:[tmp_dix]}
+                    
+                    else: # k가 list로 끝남 & 앞으로의 k들이 일렬로 전부 들어있음
+                        tmp_idx += 1
+
+            tmp_adr = bld_dix
+
+            if tmp_idx > 0: # tmp_dix 의 디렉토리와 겹치는 값이 하나 이상!
+                for k2 in k_serial[:tmp_idx]:
+                    k2_cut = k2.removesuffix(':list')
+                    # 기존 값의 어디에 붙여야 하는지 탐색.
+                    if not isinstance(tmp_adr,list):
+                        tmp_adr = tmp_adr[k2_cut]
+                    else:
+                        for dix in tmp_adr:
+                            if k2_cut in dix:
+                                tmp_adr = dix
+                                
+                    if k2 == k_serial[tmp_idx-1]:
+                        if isinstance(tmp_adr,list):
+                            tmp_dix = {k2_cut:tmp_adr.append(tmp_dix)}
+                        else:
+                            tmp_dix = {k2_cut:tmp_adr[k2_cut].append(tmp_dix)}
+            else:
+                tmp_adr.update(tmp_dix)
+
+        # for k_serial in k_map:
             
-            #상기의 for loop가 끝나면 tmp_dix를 넣는다
+        #     v_dix = dix_last[k_serial[-1]]
+        #     k_last_name = k_serial[-1].removesuffix(':list')
+        #     tmp_dix = { k_last_name : v_dix }
+        #     # k_serial 에 저장된 k_part 마다. (.../k13/k12/k11)
+        #     for k_part in reversed(k_serial):
+        #         if k_part != k_serial[-1]:
+        #             if k_part.endswith(':list'):
+        #                 k_part_cut = k_part.removesuffix(':list')
+        #                 tmp_dix = {k_part_cut:[tmp_dix]}
+        #                 # 이미 k_part_cut에 데이터가 있으면???
+        #                 # bld_dix 안에 있는 쌍을 호출해야 한다.
+        #                 vald_dix = bld_dix
+        #                 # k_serial의 처음부터 k_part(포함)까지 놓은 것을 반복
+        #                 for k_part2 in k_serial[:k_serial.index(k_part)+1]:
+        #                     if k_part2.endswith(':list'):
+        #                         k_part2_cut = k_part2.removesuffix(':list')
+        #                         # 저장된 키에 k_part2_cut 이 있으면 vald_dix 안을 스코핑.
+                                
+        #                         if isinstance(vald_dix,list):
+        #                             for vald_dix_ele in vald_dix:
+        #                                 if k_part2_cut in vald_dix_ele:
+        #                                     vald_dix = vald_dix_ele[k_part2_cut]
+        #                                     bool_in_there = True
+        #                                     break
+
+        #                         elif k_part2_cut in vald_dix:
+        #                             vald_dix = vald_dix [k_part2_cut]
+        #                             bool_in_there = True
+                                    
+        #                         if k_part2 == k_part and bool_in_there:
+        #                             for tmp_val in tmp_dix[k_part_cut]:
+        #                                 if not tmp_val in vald_dix:
+        #                                     vald_dix.append(tmp_val)
+        #                             tmp_dix[k_part_cut] = vald_dix
+        #                             bool_in_there = False
+        #                             pass
+
+        #             # 결과: 
+        #             #  
+        #             # 의도:
+        #             # {'id': 'id_sample1', 'name': {'str': '샘플 이름'}, 'skills': [{'skill': [{'combat': 'slash'}, {'craft': 'ALL'}]}, {'level': [{dice:[2,6]}, {add:4}]}]}
+        #             # 의도대로 되려면 무조건 끝에다가 붙이는 게 아니라 다시 또 검사하고 그래야 한다.
+        #             # 일단 last_dix 중에서 거꾸로 보면서 같은 녀석들을 합치고, 그러는 식으로 가야 할 것 같다.
+        #             # 결국 첫 키부터 검사하는 건 아니다 이거군.
+
+        #             # tmp_dix 재귀
+        #             # 딕셔너리 변수 재정의라서 가능함
+        #             else:
+        #                 tmp_dix = { k_part:tmp_dix }
             
-            bld_dix.update(tmp_dix)
+        #     #상기의 for loop가 끝나면 tmp_dix를 넣는다
+            
+        #     bld_dix.update(tmp_dix)
+        #     pass
 
         return bld_dix
 
@@ -345,14 +392,16 @@ if __name__ == "__main__":
         "name/str",
         "skills:list/skill:list/combat",
         "skills:list/skill:list/craft",
-        "skills:list/level"
+        "skills:list/level:list/dice:list",
+        "skills:list/level:list/add"
     ]
     vals = [
         "id_sample1",
         "샘플 이름",
         "slash",
         "ALL",
-        3
+        [2,6],
+        4
     ]
 
     result = file.dix_builder(keys, vals)
