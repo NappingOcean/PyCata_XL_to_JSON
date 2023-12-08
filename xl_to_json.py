@@ -21,39 +21,21 @@ import openpyxl as opyxl
 import json as jo
 
 #import zone
+
+
+
 class Data_Converter:
-    # 생성자. 파일의 이름을 변수로서 받는다. 
-    # 이 때 클래스 내부에서는 그 이름을 fn으로서 다룬다.
-    def __init__(self, filename):
-        self.fn = filename
-    
-    # xlsx 확장자로부터 데이터를 받는다.
-    def load_xlsx(self):
-        fn_path = "./" + self.fn
-        load_wb = opyxl.load_workbook(fn_path, data_only=True)
-        return load_wb
-    
+    def __init__(self):
+        pass
+        
     # 1행에 있는 키 중에 복잡한 키를 분리하여 리스트화.
-    def key_separator(self, keys):
+    def key_separator(self, raw_keys) -> list:
         # 받은 keys를 / 별로 짤라서 리스트로 저장한다.
-        key_serial = keys.split('/')
+        key_serial = raw_keys.split('/')
         return key_serial
     
-
-    # 해당 셀 아래로 데이터가 있는 셀이 얼마나 연달아 나오는가?
-    def col_ser_check(self, ws, row, col):
-        ser_num = 1
-        for check_row in ws.rows[row + 1:]:
-            if bool(ws.cell(check_row, col)) and not bool(ws.cell(check_row, 1)):
-                ser_num += 1
-            else:
-                return ser_num
-
-    # vals 는 2차원 리스트로 작성된다.
-    
-
     # 본격적으로 딕셔너리 구축            
-    def dix_builder(self, keys: list, vals: list):
+    def dix_builder(self, keys, vals) -> dict:
         
         #k_map = jagged list
         k_map = list(map(self.key_separator, keys))
@@ -76,14 +58,16 @@ class Data_Converter:
                     else:
                         tmp_dix = {k_cut:dix_last[k]}
                 else: # k가 맨 끝에 있는 k 가 아니다.
-                    if not k.endswith(':list'):
-                        tmp_dix = {k:tmp_dix}
-                    elif not k in [k_ser[k_idx] for k_ser in k_map[:k_map.index(k_serial)] if len(k_ser)+k_idx >= 0 and k_ser[:k_idx] == k_serial[:k_idx]]:
-                        tmp_dix = {k_cut:[tmp_dix]}
                     
-                    else: # k가 list로 끝남 & 앞으로의 k들이 일렬로 전부 들어있음
+                    if not k in [k_ser[k_idx] for k_ser in k_map[:k_map.index(k_serial)] if len(k_ser)+k_idx >= 0 and k_ser[:k_idx] == k_serial[:k_idx]]:
+                        if k.endswith(':list'):
+                            tmp_dix = {k_cut:[tmp_dix]}
+                        else:
+                            tmp_dix = {k:tmp_dix}
+                    else:
                         tmp_idx += 1
 
+            # end of for-loop: k in k_serial
             tmp_adr = bld_dix
 
             if tmp_idx > 0: # tmp_dix 의 디렉토리와 겹치는 값이 하나 이상!
@@ -99,20 +83,30 @@ class Data_Converter:
 
                     if k2 == k_serial[tmp_idx-1]:
                         if isinstance(tmp_adr,list):
-                            tmp_dix = {k2_cut:tmp_adr.append(tmp_dix)}
+                            tmp_adr.append(tmp_dix)
                         else:
-                            tmp_dix = {k2_cut:tmp_adr[k2_cut].append(tmp_dix)}
+                            if not isinstance(tmp_adr,list):
+                                tmp_adr.update(tmp_dix)
+                            else:
+                                tmp_adr.append(tmp_dix)
             else:
                 tmp_adr.update(tmp_dix)
 
+        # end of for-loop:k_serial in k_map
+
+        # Delete the key with an empty value inside
+        for key in list(bld_dix.keys()):
+            if bld_dix[key] == None:
+                del(bld_dix[key])
+        
         return bld_dix
 
     def json_to_templete(self):
             pass
     
  
-class File_Loader_opyxl:
-    def __init__(self, filename):
+class File_Loader_Opyxl:
+    def __init__(self, filename:str):
         self.fn = filename
 
     def read_file(self):
@@ -120,12 +114,12 @@ class File_Loader_opyxl:
         
         return opyxl_file
     
-    def keys_from_file(self, opyxl_file:opyxl.Workbook) -> dict: 
+    def raw_keys_from_file(self, opyxl_file:opyxl.Workbook) -> dict: 
         
         keys_dict = {}
 
         for s_name in opyxl_file.sheetnames:
-            ws = opyxl_file.get_sheet_by_name(s_name)
+            ws = opyxl_file[s_name]
             list_from_ws = [ws.cell(row = 1, column= i+1).value for i in range(ws.max_column)]
             # for idx in range(len(list_from_ws)):
             #     if list_from_ws[idx].startswith('Unnamed: '):
@@ -134,13 +128,25 @@ class File_Loader_opyxl:
             keys_dict[s_name] = list_from_ws
 
         return keys_dict
+    
+    def keys_pro(self, opyxl_file:opyxl.Workbook):
+
+        keys_dict = {}
+
+        r_keys = self.raw_keys_from_file(opyxl_file)
+
+        for name in opyxl_file.sheetnames:
+            keys_dict[name] = list(filter(None, r_keys[name]))
+
+        return keys_dict
+
 
     def raw_vals_from_file(self, opyxl_file:opyxl.Workbook) -> dict: 
         
         raw_vals_dict = {}
 
         for s_name in opyxl_file.sheetnames:
-            ws = opyxl_file.get_sheet_by_name(s_name)
+            ws = opyxl_file[s_name]
             
             list_from_ws = [[ws.cell(row=y+1, column=x+1).value for x in range(ws.max_column)] for y in range(ws.max_row)]
             # for lst in list_from_ws:
@@ -166,7 +172,7 @@ class File_Loader_opyxl:
 
         vals_dict = {}
 
-        keys = self.keys_from_file(opyxl_file)
+        keys = self.raw_keys_from_file(opyxl_file)
         r_vals = self.raw_vals_from_file(opyxl_file)
 
         for s_name in opyxl_file.sheetnames:
@@ -230,36 +236,91 @@ class File_Loader_opyxl:
                 # end of for-loop:col
                 val_dict_in_sht.update({val_id:val_dict_in_row})
             # end of for-loop:row
-            vals_dict[s_name] = list(filter(None, [val_dict_in_sht[key] for key in val_dict_in_sht.keys()]))
+            vals_dict[s_name] = list(filter(None, [val_dict_in_sht[key] for key in val_dict_in_sht.keys()])) # val_dict_in_sht:dict 중에서 비어있는 딕션을 없앤다.
+            vals_dict[s_name] = [list(vals_dict[s_name][i].values()) for i in range(len(vals_dict[s_name]))] #vals_dict 를 list를 value로 가진 dict로 재정의한다.
         # end of for-loop:s_name
         return vals_dict
     
+class File_Open_Path:
+    def __init__(self, xl_path:str = './Excel/', jo_path:str = './JSON/'):
+        self.xp = xl_path
+        self.jp = jo_path
+
+    def jo_writer(self, ls_data:list, jo_name:str)-> None:
+        name = jo_name + ".json"
+        with open(self.jp + name, 'w', encoding="utf-8") as file:
+            jo.dump(ls_data, file, indent=3)
+       
+    def xl_reader(self) -> str:
+        return self.xp
 
 if __name__ == "__main__":
     
-    # Test build
+    main_filename_xl = "test_XL.xlsx"
 
-    main_keys = [
-        "id",
-        "name/str",
-        "skills:list/skill:list/combat",
-        "skills:list/skill:list/craft",
-        "skills:list/level/dice:list",
-        "skills:list/level/add"
-    ]
-    main_vals = [
-        "id_sample1",
-        "샘플 이름",
-        "slash",
-        "ALL",
-        [2,6],
-        4
-    ] 
+    main_xl = File_Loader_Opyxl(main_filename_xl)
+
+    main_wb = main_xl.read_file()
+    m_k_fr_xl = main_xl.keys_pro(main_wb)
+    m_v_fr_xl = main_xl.vals_pro(main_wb)
+
+    m_xl_conv = Data_Converter()
+
     
-    # on openpyxl
+    
+    for name in list(m_v_fr_xl.keys()):
+        data_list = []
+        for i in range(len(m_v_fr_xl[name])):
+            data = {'type':name}
+            data.update(m_xl_conv.dix_builder(m_k_fr_xl[name], m_v_fr_xl[name][i]))
+            data_list.append(data)
+        # end of for-loop:i
+        File_Open_Path().jo_writer(data_list,str(name))
+    # end of for-loop:name
 
-    main_file_px = File_Loader_opyxl("test_XL.xlsx")
 
-    print(main_file_px.vals_pro(main_file_px.read_file()))
 
+    # ### Test build
+
+    # main_keys = [
+    #     "id",
+    #     "name/str",
+    #     "skills:list/skill:list/combat",
+    #     "skills:list/skill:list/craft",
+    #     "skills:list/level/dice:list",
+    #     "skills:list/level/add"
+    # ]
+    # main_vals = [
+    #     "id_sample1",
+    #     "샘플 이름",
+    #     "slash",
+    #     "ALL",
+    #     [2,6],
+    #     4
+    # ] 
+    
+    # # test_conv = Data_Converter(main_keys, main_vals)
+
+    # # print(test_conv.dix_builder())
+
+    # # on openpyxl
+
+    # main_file_px = File_Loader_Opyxl("test_XL.xlsx")
+
+    # main_reading = main_file_px.read_file()
+    # main_keys_from_xl = main_file_px.keys_pro(main_reading)
+    # main_vals_from_xl = main_file_px.vals_pro(main_reading)
+
+    # names = main_reading.sheetnames
+
+    # xl_conv = Data_Converter()
+
+    # print(main_keys_from_xl["GENERIC"])
+
+    # print(len(main_keys_from_xl["GENERIC"]))
+
+    # print(main_vals_from_xl["GENERIC"][0])
+    # print(len(main_vals_from_xl["GENERIC"][0]))
+
+    # print(xl_conv.dix_builder(main_keys_from_xl["GENERIC"],main_vals_from_xl["GENERIC"][0]))
 
