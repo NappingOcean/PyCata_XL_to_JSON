@@ -19,6 +19,7 @@
 
 import openpyxl as opyxl
 import json as jo
+import os
 
 #import zone
 
@@ -278,7 +279,10 @@ class Xl_to_Json:
                 data.update(m_xl_conv.dix_builder(m_k_fr_xl[name], m_v_fr_xl[name][i]))
                 data_list.append(data)
             # end of for-loop:i
-            File_Open_Path(self.xp, self.jp).jo_writer(data_list,str(name))
+            xl_jo_dir = self.jp + self.fn_xl[:-5]+"/"
+            if not(os.path.isdir(xl_jo_dir)):
+                os.makedirs(os.path.join(xl_jo_dir))
+            File_Open_Path(self.xp, xl_jo_dir).jo_writer(data_list,str(name))
         # end of for-loop:name
 
 if __name__ == "__main__":
